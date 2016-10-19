@@ -13,13 +13,27 @@ def main():
     global posvecs
     global wordvec_len
     global posvec_len
+    global tag_classes
     
     n = 5
-    wordvec_len = 100
-    posvec_len = 20
+    wordvec_len = 10
+    posvec_len = 5
     
     
     tags = ['sd','b','sv','aa','%','+','ha','qy','x','ny','fc','qw','nn','bk','h','qy^d','fo_o_fw_by_bc','bh','^q','bf','na','ad', '^2','b^m','qo','qh','^h','ar','ng','br','no','fp','qrr','arp_nd','t3','oo_co_cc','t1','bd','aap_am', '^g','qw^d','fa','ft','ba','fo_o_fw_"_by_bc']
+
+    comm_stat = ['%','t1','t3','x','%']
+    inf = ['^t','^c']
+    statement = ['sd','sv']
+    infl_adr_fut_act = ['qy', 'qw', 'qo', 'qr', 'qrr', '^d', '^g','ad','qy^d','qw^d','qh']
+    comm_spkr_fut_act = ['oo','co','cc','oo_co_cc']
+    oth_frwd_func = ['fp','fc','fx','fe','fo','ft','fw','fa','fo_o_fw_"_by_bc']
+    agreement = ['aa','aap','am','arp','ar','^h','aap_am']
+    understanding = ['br','br^m','b','bh','bk','b^m','^2','bf','ba','by','bd','bc']
+    answer = ['ny','nn','na','ng','no','nn^e','ny^e','sd^e','sv^e','^e','arp_nd']
+    other = ['^q','h']
+
+    tag_classes = [comm_stat,inf,statement,infl_adr_fut_act,comm_spkr_fut_act,oth_frwd_func,agreement,understanding,answer,other]
     tag_vecs = dict(zip(tags,np.eye(len(tags))))
 
     corpus = CorpusReader('swda_time', 'swda_time/swda-metadata-ext.csv')
@@ -37,6 +51,7 @@ def main():
 
     #'''
     featvecs = []
+    ylen = len(tag_classes)
     for trans in corpus.iter_transcripts(display_progress=False):
         end_prev_turn = trans.utterances[0].end_turn
         prev_uttvec = np.zeros(wordvec_len)
@@ -44,9 +59,9 @@ def main():
             ftv = create_feature_vec(utt,end_prev_turn,prev_uttvec)
             featvecs.append(ftv)
             end_prev_turn = utt.end_turn
-            prev_uttvec = ftv[len(tags):len(tags)+wordvec_len]
+            prev_uttvec = ftv[ylen:ylen+wordvec_len]
 
-    build_ngram_data(featvecs,n,len(tags))
+    build_ngram_data(featvecs,n,ylen)
     #'''
     
 def build_ngram_data(featvecs,n,ylen):
@@ -57,7 +72,7 @@ def build_ngram_data(featvecs,n,ylen):
     for i in range(len(featvecs)-1):
         if len(gram) == n:
             X.append(np.array(gram))
-            y.append(featvecs[i+1][:ylen])
+            y.append(np.array(featvecs[i+1][:ylen]))
         if None in featvecs[i]:
             gram = deque([],n)
         else:
@@ -70,7 +85,8 @@ def build_ngram_data(featvecs,n,ylen):
 def create_feature_vec(utt,end_prev_turn,prev_uttvec):
     feat_vec = []
 
-    feat_vec.extend(tag_vecs[utt.damsl_act_tag()])
+    #feat_vec.extend(tag_vecs[utt.damsl_act_tag()])
+    feat_vec.extend(tag_class_vec(utt.damsl_act_tag()))
     uttvec = utterance_vec(utt.pos_words())
     feat_vec.extend(uttvec)
     feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
@@ -92,14 +108,33 @@ def create_feature_vec(utt,end_prev_turn,prev_uttvec):
 
     # add cosine distance of previous and current utterance vec
     feat_vec.append(cosine_dist(prev_uttvec,uttvec))
-    
+
+    if utt.caller == 'A':
+        feat_vec.extend([1,0])
+    elif utt.caller == 'B':
+        feat_vec.extend([0,1])
+
     return feat_vec
+
+def tag_class_vec(tag):
+    global prev_tag
+    if tag == '+':
+        tag = prev_tag
+    vec = np.zeros(len(tag_classes))
+    for i in range(len(tag_classes)):
+        if tag in tag_classes[i]:
+            vec[i]=1
+            prev_tag = tag
+            return vec
+        
+    print('not in any class: %s'%tag)
+    return vec
+
 
 def cosine_dist(u,v):
     return np.dot(u, v) / (np.sqrt(np.dot(u, u)) * np.sqrt(np.dot(v, v))) 
 
 def utterance_vec(utt_words):
-    
     utttxt = np.array([wordvecs[w.lower()] for w in utt_words if w in wordvecs.vocab])
     if len(utttxt) > 0:
         utt_vec = np.sum(utttxt,axis=0)/len(utttxt)
@@ -108,7 +143,6 @@ def utterance_vec(utt_words):
     return utt_vec
 
 def utterance_pos_vec(utt_lemmas):
-    
     uttpos = np.array([posvecs[wp[1]] for wp in utt_lemmas if wp[1] in posvecs.vocab])
     if len(uttpos) > 0:
         pos_vec = np.sum(uttpos,axis=0)/len(uttpos)
