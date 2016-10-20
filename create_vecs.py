@@ -15,7 +15,7 @@ def main():
     global posvec_len
     global tag_classes
     
-    n = 5
+    n = 3
     wordvec_len = 10
     posvec_len = 5
     
@@ -104,10 +104,10 @@ def create_feature_vec(utt,end_prev_turn,prev_uttvec):
         feat_vec.append(None)
 
     # add nr of word in utterance
-    feat_vec.append(len(utt.pos_words()))
+    #feat_vec.append(len(utt.pos_words()))
 
     # add cosine distance of previous and current utterance vec
-    feat_vec.append(cosine_dist(prev_uttvec,uttvec))
+    #feat_vec.append(cosine_dist(prev_uttvec,uttvec))
 
     if utt.caller == 'A':
         feat_vec.extend([1,0])

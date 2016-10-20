@@ -3,17 +3,19 @@ import numpy as np
 from keras.layers import Dense
 from keras.layers.recurrent import SimpleRNN
 from keras.models import Sequential
+from keras.regularizers import l2
+
 
 
 def main():
 
     print('loading data...')
-    X = np.array(pickle.load(open('data/X.pkl','rb')))
-    Y = np.array(pickle.load(open('data/y.pkl','rb')))
+    X = np.array(pickle.load(open('data/X3.pkl','rb')))
+    Y = np.array(pickle.load(open('data/y3.pkl','rb')))
 
     n = X.shape[1]
 
-    split = 80 
+    split = 90 
     X_train = []
     y_train = []
     X_test = []
@@ -29,28 +31,31 @@ def main():
             y_test.append(y)
          
     in_n = X.shape[2]
-    hidden_n = 80
     out_n = Y.shape[1]
-
+    hidden_n = in_n-(in_n-out_n)/2
+    print('nr of features:\t%d\nnr of hidden n:\t%d\nnr of labels:\t%d\n'%(in_n,hidden_n,out_n))
+    
     print('compiling model computational graph...')
     model = build_model(n,in_n,out_n,hidden_n)
 
     
-    model.compile(optimizer='rmsprop',
+    model.compile(optimizer='sgd',
               loss='categorical_crossentropy',
               metrics=['accuracy'])
 
     print('train...')
-    model.fit(np.array(X_train),np.array(y_train),nb_epoch=1)
+    model.fit(np.array(X_train),np.array(y_train),nb_epoch=100)
 
     print('test...')
     print(model.evaluate(np.array(X_test),np.array(y_test)))
     y_preds = model.predict(np.array(X_test),verbose=1)
+
+    pickle.dump(y_preds,open('data/output_%dgram_smallvecs.pkl'%n,'wb'))
     
 def build_model(n,inlen,outlen,hidden_n):
     model = Sequential()
     model.add(SimpleRNN(hidden_n,input_shape=(n,inlen),activation='tanh',return_sequences=False))
-    model.add(Dense(outlen,activation='softmax'))
+    model.add(Dense(outlen,W_regularizer=l2(0.01), activation='softmax'))
 
     return model
                   
