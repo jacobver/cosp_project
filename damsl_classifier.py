@@ -10,8 +10,8 @@ from keras.regularizers import l2
 def main():
 
     print('loading data...')
-    X = np.array(pickle.load(open('data/X3.pkl','rb')))
-    Y = np.array(pickle.load(open('data/y3.pkl','rb')))
+    X = np.array(pickle.load(open('data/X3_20wv_5pv.pkl','rb')))
+    Y = np.array(pickle.load(open('data/y3_20wv_5pv.pkl','rb')))
 
     n = X.shape[1]
 
@@ -44,13 +44,14 @@ def main():
               metrics=['accuracy'])
 
     print('train...')
-    model.fit(np.array(X_train),np.array(y_train),nb_epoch=100)
+    model.fit(np.array(X_train),np.array(y_train),nb_epoch=300)
 
     print('test...')
     print(model.evaluate(np.array(X_test),np.array(y_test)))
     y_preds = model.predict(np.array(X_test),verbose=1)
 
-    pickle.dump(y_preds,open('data/output_%dgram_smallvecs.pkl'%n,'wb'))
+    pickle.dump(y_preds,open('data/output_%dgram_20wv_5pv.pkl'%n,'wb'))
+    pickle.dump(y_test,open('data/test_%dgram_20wv_5pv.pkl'%n,'wb'))
     
 def build_model(n,inlen,outlen,hidden_n):
     model = Sequential()

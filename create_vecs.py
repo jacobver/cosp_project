@@ -14,13 +14,14 @@ def main():
     global wordvec_len
     global posvec_len
     global tag_classes
+    global prev_tag
     
     n = 3
-    wordvec_len = 10
+    wordvec_len = 20
     posvec_len = 5
     
     
-    tags = ['sd','b','sv','aa','%','+','ha','qy','x','ny','fc','qw','nn','bk','h','qy^d','fo_o_fw_by_bc','bh','^q','bf','na','ad', '^2','b^m','qo','qh','^h','ar','ng','br','no','fp','qrr','arp_nd','t3','oo_co_cc','t1','bd','aap_am', '^g','qw^d','fa','ft','ba','fo_o_fw_"_by_bc']
+    tags = ['sd','b','sv','aa','%','ha','qy','x','ny','fc','qw','nn','bk','h','qy^d','fo_o_fw_by_bc','bh','^q','bf','na','ad', '^2','b^m','qo','qh','^h','ar','ng','br','no','fp','qrr','arp_nd','t3','oo_co_cc','t1','bd','aap_am', '^g','qw^d','fa','ft','ba','fo_o_fw_"_by_bc']
 
     comm_stat = ['%','t1','t3','x','%']
     inf = ['^t','^c']
@@ -43,27 +44,31 @@ def main():
     #word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
 
     # create pos (word) vecs
-    #write_pos_to_file(corpus)
-    #word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
+    write_pos_to_file(corpus)
+    word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
 
     wordvecs = word2vec.load('data/wordvecs.bin')
     posvecs =  word2vec.load('data/posvecs.bin')
 
-    #'''
+    
     featvecs = []
-    ylen = len(tag_classes)
+    ylen = len(tags)
     for trans in corpus.iter_transcripts(display_progress=False):
         end_prev_turn = trans.utterances[0].end_turn
         prev_uttvec = np.zeros(wordvec_len)
+        prev_tag = ''
         for utt in trans.utterances:
-            ftv = create_feature_vec(utt,end_prev_turn,prev_uttvec)
+            tag,ftv = create_feature_vec(utt,end_prev_turn,prev_uttvec,prev_tag)
             featvecs.append(ftv)
             end_prev_turn = utt.end_turn
             prev_uttvec = ftv[ylen:ylen+wordvec_len]
+            prev_tag = tag
 
     build_ngram_data(featvecs,n,ylen)
+
     #'''
     
+
 def build_ngram_data(featvecs,n,ylen):
 
     X = []
@@ -78,30 +83,35 @@ def build_ngram_data(featvecs,n,ylen):
         else:
             gram.append(featvecs[i])
             
-    pickle.dump(X, open('data/X%d.pkl'%n,'wb'))
-    pickle.dump(y, open('data/y%d.pkl'%n,'wb'))        
+    pickle.dump(X, open('data/X%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))
+    pickle.dump(y, open('data/y%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))        
+        
             
-            
-def create_feature_vec(utt,end_prev_turn,prev_uttvec):
+def create_feature_vec(utt,end_prev_turn,prev_uttvec,prev_tag):
     feat_vec = []
 
-    #feat_vec.extend(tag_vecs[utt.damsl_act_tag()])
-    feat_vec.extend(tag_class_vec(utt.damsl_act_tag()))
+    
+    tag = utt.damsl_act_tag()
+    if tag == '+':
+        tag = prev_tag
+    feat_vec.extend(tag_vecs[tag])
+
     uttvec = utterance_vec(utt.pos_words())
     feat_vec.extend(uttvec)
+
     feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
 
     # add transition time 
-    try:
-        feat_vec.append(utt.start_turn - end_prev_turn)
-    except TypeError:
-        feat_vec.append(None)
+    #try:
+    #    feat_vec.append(utt.start_turn - end_prev_turn)
+    #except TypeError:
+    #    feat_vec.append(None)
 
     # add utterance lengts in milisecond 
-    try:
-        feat_vec.append(utt.end_turn - utt.start_turn)
-    except TypeError:
-        feat_vec.append(None)
+    #try:
+    #    feat_vec.append(utt.end_turn - utt.start_turn)
+    #except TypeError:
+    #    feat_vec.append(None)
 
     # add nr of word in utterance
     #feat_vec.append(len(utt.pos_words()))
@@ -114,7 +124,7 @@ def create_feature_vec(utt,end_prev_turn,prev_uttvec):
     elif utt.caller == 'B':
         feat_vec.extend([0,1])
 
-    return feat_vec
+    return tag,feat_vec
 
 def tag_class_vec(tag):
     global prev_tag
