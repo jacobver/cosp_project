@@ -1,4 +1,4 @@
-from swda_time import CorpusReader
+from swda import CorpusReader
 import numpy as np
 import word2vec
 from nltk.tokenize import RegexpTokenizer
@@ -37,35 +37,36 @@ def main():
     tag_classes = [comm_stat,inf,statement,infl_adr_fut_act,comm_spkr_fut_act,oth_frwd_func,agreement,understanding,answer,other]
     tag_vecs = dict(zip(tags,np.eye(len(tags))))
 
-    corpus = CorpusReader('swda_time', 'swda_time/swda-metadata-ext.csv')
+    corpus = CorpusReader('swda')
 
     # create word vecs
     #write_text_to_file(corpus)
     #word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
 
     # create pos (word) vecs
-    write_pos_to_file(corpus)
-    word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
+    #write_pos_to_file(corpus)
+    #word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
 
     wordvecs = word2vec.load('data/wordvecs.bin')
-    posvecs =  word2vec.load('data/posvecs.bin')
+    #posvecs =  word2vec.load('data/posvecs.bin')
 
-    
+    nrT = 0
+    nrUtt = 0
     featvecs = []
     ylen = len(tags)
     for trans in corpus.iter_transcripts(display_progress=False):
-        end_prev_turn = trans.utterances[0].end_turn
         prev_uttvec = np.zeros(wordvec_len)
         prev_tag = ''
+        nrT += 1
         for utt in trans.utterances:
-            tag,ftv = create_feature_vec(utt,end_prev_turn,prev_uttvec,prev_tag)
+            tag,ftv = create_feature_vec(utt,prev_uttvec,prev_tag)
             featvecs.append(ftv)
-            end_prev_turn = utt.end_turn
             prev_uttvec = ftv[ylen:ylen+wordvec_len]
             prev_tag = tag
-
+            nrUtt += 1
     build_ngram_data(featvecs,n,ylen)
 
+    print(nrT,nrUtt)
     #'''
     
 
@@ -87,7 +88,7 @@ def build_ngram_data(featvecs,n,ylen):
     pickle.dump(y, open('data/y%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))        
         
             
-def create_feature_vec(utt,end_prev_turn,prev_uttvec,prev_tag):
+def create_feature_vec(utt,prev_uttvec,prev_tag):
     feat_vec = []
 
     
@@ -99,7 +100,7 @@ def create_feature_vec(utt,end_prev_turn,prev_uttvec,prev_tag):
     uttvec = utterance_vec(utt.pos_words())
     feat_vec.extend(uttvec)
 
-    feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
+    #feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
 
     # add transition time 
     #try:
