@@ -46,11 +46,11 @@ def main():
 
     # create pos (word) vecs
     #write_pos_to_file(corpus)
-    #word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
+    #Xword2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
 
     # create tag (word) vecs
-    write_tags_to_file(corpus)
-    word2vec.word2vec('data/trans_tag_sens.txt','data/tagvecs.bin',size=tagvec_len)
+    #write_tags_to_file(corpus)
+    #word2vec.word2vec('data/trans_tag_sens.txt','data/tagvecs.bin',size=tagvec_len)
     
     
     wordvecs = word2vec.load('data/wordvecs.bin')
@@ -59,23 +59,26 @@ def main():
     
     nrT = 0
     nrUtt = 0
-    featvecs = []
+    X = []
     y = []
     
     ylen = len(tags)
     for trans in corpus.iter_transcripts(display_progress=False):
+        diag_x = []
+        diag_y = []
         prev_uttvec = np.zeros(wordvec_len)
         prev_tag = ''
         nrT += 1
         for utt in trans.utterances:
             tag,ftv = create_feature_vec(utt,prev_uttvec,prev_tag)
-            featvecs.append(ftv)
-            y.append(tag_vecs_1h[tag])
+            diag_x.append(ftv)
+            diag_y.append(np.array(tag_vecs_1h[tag]))
             prev_uttvec = ftv[tagvec_len:tagvec_len+wordvec_len]
             prev_tag = tag
             nrUtt += 1
-
-    pickle.dump([featvecs[:-1],y[1:]],open('data/Xy_all.pkl','wb'))
+        X.append(np.array(diag_x[:-1]))
+        y.append(np.array(diag_y[1:]))
+    pickle.dump([np.array(X),np.array(y)],open('data/Xy_all.pkl','wb'))
 
     #build_ngram_data(featvecs,n,ylen)
 
@@ -106,7 +109,7 @@ def create_feature_vec(utt,prev_uttvec,prev_tag):
     elif utt.caller == 'B':
         feat_vec.extend([0,1])
 
-    return tag,feat_vec
+    return tag,np.array(feat_vec)
 
 
 def build_ngram_data(featvecs,n,ylen):
