@@ -1,13 +1,15 @@
 from swda import CorpusReader
 import numpy as np
 import word2vec
-from nltk.tokenize import RegexpTokenizer
+from nltk.tokenize import WordPunctTokenizer
 from  collections import deque
 import pickle
 #from gensim.models.word2vec import Word2Vec
 
 def main():
 
+    global word_toker
+    word_toker = WordPunctTokenizer()
     global tag_vecs_1h
     global tagvecs
     global wordvecs
@@ -41,8 +43,8 @@ def main():
     corpus = CorpusReader('swda')
 
     # create word vecs
-    #write_text_to_file(corpus)
-    #word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
+    write_text_to_file(corpus)
+    word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
 
     # create pos (word) vecs
     #write_pos_to_file(corpus)
@@ -78,7 +80,7 @@ def main():
             nrUtt += 1
         X.append(np.array(diag_x[:-1]))
         y.append(np.array(diag_y[1:]))
-    pickle.dump([np.array(X),np.array(y)],open('data/Xy_all.pkl','wb'))
+    pickle.dump([np.array(X),np.array(y)],open('data/Xy_words_tags.pkl','wb'))
 
     #build_ngram_data(featvecs,n,ylen)
 
@@ -93,10 +95,10 @@ def create_feature_vec(utt,prev_uttvec,prev_tag):
         tag = prev_tag
     feat_vec.extend(tagvecs[tag])
 
-    uttvec = utterance_vec(utt.pos_words())
+    uttvec = utterance_vec(utt.text_words())
     feat_vec.extend(uttvec)
 
-    feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
+    #feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
 
     # add nr of word in utterance
     #feat_vec.append(len(utt.pos_words()))
@@ -149,11 +151,13 @@ def cosine_dist(u,v):
     return np.dot(u, v) / (np.sqrt(np.dot(u, u)) * np.sqrt(np.dot(v, v))) 
 
 def utterance_vec(utt_words):
-    utttxt = np.array([wordvecs[w.lower()] for w in utt_words if w in wordvecs.vocab])
+    words = word_toker.tokenize(' '.join([w.lower() for w in utt_words if w[0] != '{' ]))
+    utttxt = np.array([wordvecs[w] for w in words if w in wordvecs.vocab])
     if len(utttxt) > 0:
         utt_vec = np.sum(utttxt,axis=0)/len(utttxt)
     else:
         utt_vec = np.zeros(wordvec_len)
+        print('no words!! -- %s'%utt_words)
     return utt_vec
 
 def utterance_pos_vec(utt_lemmas):
@@ -165,10 +169,11 @@ def utterance_pos_vec(utt_lemmas):
     return pos_vec
     
 def write_text_to_file(corpus):
+
     with open('data/utterances.txt','w') as f:
         for trans in corpus.iter_transcripts(display_progress=False):
             for utt in trans.utterances:
-                utttxt = [w.lower() for w in utt.pos_words()]
+                utttxt = word_toker.tokenize(' '.join([w.lower() for w in utt.text_words() if  w[0] != '{' ]))
                 utttxt.append('\n')
                 f.write(' '.join(utttxt))
 
