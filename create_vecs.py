@@ -26,7 +26,7 @@ def main():
     
     tags = ['sd','b','sv','aa','%','ha','qy','x','ny','fc','qw','nn','bk','h','qy^d','fo_o_fw_by_bc','bh','^q','bf','na','ad', '^2','b^m','qo','qh','^h','ar','ng','br','no','fp','qrr','arp_nd','t3','oo_co_cc','t1','bd','aap_am', '^g','qw^d','fa','ft','ba','fo_o_fw_"_by_bc']
 
-    comm_stat = ['%','t1','t3','x','%']
+    comm_stat = ['%','t1','t3','x']
     inf = ['^t','^c']
     statement = ['sd','sv']
     infl_adr_fut_act = ['qy', 'qw', 'qo', 'qr', 'qrr', '^d', '^g','ad','qy^d','qw^d','qh']
@@ -69,26 +69,22 @@ def main():
     for trans in corpus.iter_transcripts(display_progress=False):
         diag_x = []
         diag_y = []
-        prev_uttvec = np.zeros(wordvec_len)
         prev_tag = ''
         nrT += 1
         for utt in trans.utterances:
-            tag,ftv = create_feature_vec(utt,prev_uttvec,prev_tag)
+            tag,ftv = create_feature_vec(utt,prev_tag)
             diag_x.append(ftv)
-            diag_y.append(np.array(tag_vecs_1h[tag]))
-            prev_uttvec = ftv[tagvec_len:tagvec_len+wordvec_len]
+            diag_y.append(np.array(tag_class_vec(tag)))
             prev_tag = tag
             nrUtt += 1
         X.append(np.array(diag_x[:-1]))
         y.append(np.array(diag_y[1:]))
-    #pickle.dump([np.array(X),np.array(y)],open('data/Xy_words_tags.pkl','wb'))
-
-    build_ngram_data(n,X,y)
+    pickle.dump([np.array(X),np.array(y)],open('data/Xy_words_tags_pos_tagclasses.pkl','wb'))
 
     print(nrT,nrUtt)
-    #'''
+    
             
-def create_feature_vec(utt,prev_uttvec,prev_tag):
+def create_feature_vec(utt,prev_tag):
     feat_vec = []
 
     tag = utt.damsl_act_tag()
@@ -99,13 +95,10 @@ def create_feature_vec(utt,prev_uttvec,prev_tag):
     uttvec = utterance_vec(utt.text_words())
     feat_vec.extend(uttvec)
 
-    #feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
+    feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
 
     # add nr of word in utterance
     #feat_vec.append(len(utt.pos_words()))
-
-    # add cosine distance of previous and current utterance vec
-    #feat_vec.append(cosine_dist(prev_uttvec,uttvec))
 
     if utt.caller == 'A':
         feat_vec.extend([1,0])
@@ -114,33 +107,12 @@ def create_feature_vec(utt,prev_uttvec,prev_tag):
 
     return tag,np.array(feat_vec)
 
-
-def build_ngram_data(n,Xin,yin):
-
-    X = []
-    y = []
-    for diag_x,diag_y in zip(Xin,yin):
-        gram = deque([],n)
-        for x,single_y in zip(diag_x,diag_y):
-            if len(gram) == n:
-                X.append(np.array(gram))
-                y.append(np.array(single_y))
-            else:
-                gram.append(x)
-            
-    pickle.dump(X, open('data/X%d_%dwv.pkl'%(n,wordvec_len),'wb'))
-    pickle.dump(y, open('data/y%d_%dwv.pkl'%(n,wordvec_len),'wb'))        
-
     
 def tag_class_vec(tag):
-    global prev_tag
-    if tag == '+':
-        tag = prev_tag
     vec = np.zeros(len(tag_classes))
     for i in range(len(tag_classes)):
         if tag in tag_classes[i]:
             vec[i]=1
-            prev_tag = tag
             return vec
         
     print('not in any class: %s'%tag)
