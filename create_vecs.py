@@ -8,7 +8,8 @@ import pickle
 
 def main():
 
-    global tag_vecs
+    global tag_vecs_1h
+    global tagvecs
     global wordvecs
     global posvecs
     global wordvec_len
@@ -17,9 +18,9 @@ def main():
     global prev_tag
     
     n = 3
-    wordvec_len = 20
-    posvec_len = 5
-    
+    wordvec_len = 50
+    posvec_len = 10
+    tagvec_len = 20
     
     tags = ['sd','b','sv','aa','%','ha','qy','x','ny','fc','qw','nn','bk','h','qy^d','fo_o_fw_by_bc','bh','^q','bf','na','ad', '^2','b^m','qo','qh','^h','ar','ng','br','no','fp','qrr','arp_nd','t3','oo_co_cc','t1','bd','aap_am', '^g','qw^d','fa','ft','ba','fo_o_fw_"_by_bc']
 
@@ -35,7 +36,7 @@ def main():
     other = ['^q','h']
 
     tag_classes = [comm_stat,inf,statement,infl_adr_fut_act,comm_spkr_fut_act,oth_frwd_func,agreement,understanding,answer,other]
-    tag_vecs = dict(zip(tags,np.eye(len(tags))))
+    tag_vecs_1h = dict(zip(tags,np.eye(len(tags))))
 
     corpus = CorpusReader('swda')
 
@@ -47,12 +48,20 @@ def main():
     #write_pos_to_file(corpus)
     #word2vec.word2vec('data/utterances_postags.txt','data/posvecs.bin',size=posvec_len)
 
+    # create tag (word) vecs
+    write_tags_to_file(corpus)
+    word2vec.word2vec('data/trans_tag_sens.txt','data/tagvecs.bin',size=tagvec_len)
+    
+    
     wordvecs = word2vec.load('data/wordvecs.bin')
-    #posvecs =  word2vec.load('data/posvecs.bin')
-
+    posvecs =  word2vec.load('data/posvecs.bin')
+    tagvecs = word2vec.load('data/tagvecs.bin')
+    
     nrT = 0
     nrUtt = 0
     featvecs = []
+    y = []
+    
     ylen = len(tags)
     for trans in corpus.iter_transcripts(display_progress=False):
         prev_uttvec = np.zeros(wordvec_len)
@@ -61,14 +70,44 @@ def main():
         for utt in trans.utterances:
             tag,ftv = create_feature_vec(utt,prev_uttvec,prev_tag)
             featvecs.append(ftv)
-            prev_uttvec = ftv[ylen:ylen+wordvec_len]
+            y.append(tag_vecs_1h[tag])
+            prev_uttvec = ftv[tagvec_len:tagvec_len+wordvec_len]
             prev_tag = tag
             nrUtt += 1
-    build_ngram_data(featvecs,n,ylen)
+
+    pickle.dump([featvecs[:-1],y[1:]],open('data/Xy_all.pkl','wb'))
+
+    #build_ngram_data(featvecs,n,ylen)
 
     print(nrT,nrUtt)
     #'''
-    
+            
+def create_feature_vec(utt,prev_uttvec,prev_tag):
+    feat_vec = []
+
+    tag = utt.damsl_act_tag()
+    if tag == '+':
+        tag = prev_tag
+    feat_vec.extend(tagvecs[tag])
+
+    uttvec = utterance_vec(utt.pos_words())
+    feat_vec.extend(uttvec)
+
+    feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
+
+    # add nr of word in utterance
+    #feat_vec.append(len(utt.pos_words()))
+
+    # add cosine distance of previous and current utterance vec
+    #feat_vec.append(cosine_dist(prev_uttvec,uttvec))
+
+    if utt.caller == 'A':
+        feat_vec.extend([1,0])
+    elif utt.caller == 'B':
+        feat_vec.extend([0,1])
+
+    return tag,feat_vec
+
 
 def build_ngram_data(featvecs,n,ylen):
 
@@ -86,47 +125,8 @@ def build_ngram_data(featvecs,n,ylen):
             
     pickle.dump(X, open('data/X%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))
     pickle.dump(y, open('data/y%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))        
-        
-            
-def create_feature_vec(utt,prev_uttvec,prev_tag):
-    feat_vec = []
 
     
-    tag = utt.damsl_act_tag()
-    if tag == '+':
-        tag = prev_tag
-    feat_vec.extend(tag_vecs[tag])
-
-    uttvec = utterance_vec(utt.pos_words())
-    feat_vec.extend(uttvec)
-
-    #feat_vec.extend(utterance_pos_vec(utt.pos_lemmas()))
-
-    # add transition time 
-    #try:
-    #    feat_vec.append(utt.start_turn - end_prev_turn)
-    #except TypeError:
-    #    feat_vec.append(None)
-
-    # add utterance lengts in milisecond 
-    #try:
-    #    feat_vec.append(utt.end_turn - utt.start_turn)
-    #except TypeError:
-    #    feat_vec.append(None)
-
-    # add nr of word in utterance
-    #feat_vec.append(len(utt.pos_words()))
-
-    # add cosine distance of previous and current utterance vec
-    #feat_vec.append(cosine_dist(prev_uttvec,uttvec))
-
-    if utt.caller == 'A':
-        feat_vec.extend([1,0])
-    elif utt.caller == 'B':
-        feat_vec.extend([0,1])
-
-    return tag,feat_vec
-
 def tag_class_vec(tag):
     global prev_tag
     if tag == '+':
@@ -176,6 +176,19 @@ def write_pos_to_file(corpus):
                 utttxt = [w_p[1] for w_p in utt.pos_lemmas()]
                 utttxt.append('\n')
                 f.write(' '.join(utttxt))
+
+def write_tags_to_file(corpus):
+    with open('data/trans_tag_sens.txt','w') as f:
+        for trans in corpus.iter_transcripts(display_progress=False):
+            tag_sen = []
+            prev_tag = ''
+            for utt in trans.utterances:
+                t = utt.damsl_act_tag()
+                tag = prev_tag if t == '+' else t
+                tag_sen.append(tag)
+                prev_tag = tag
+                tag_sen.append('\n')
+            f.write(' '.join(tag_sen))
 
 
 if __name__ == '__main__':
