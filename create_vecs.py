@@ -43,8 +43,8 @@ def main():
     corpus = CorpusReader('swda')
 
     # create word vecs
-    write_text_to_file(corpus)
-    word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
+    #write_text_to_file(corpus)
+    #word2vec.word2vec('data/utterances.txt','data/wordvecs.bin',size=wordvec_len)
 
     # create pos (word) vecs
     #write_pos_to_file(corpus)
@@ -65,6 +65,7 @@ def main():
     y = []
     
     ylen = len(tags)
+
     for trans in corpus.iter_transcripts(display_progress=False):
         diag_x = []
         diag_y = []
@@ -80,9 +81,9 @@ def main():
             nrUtt += 1
         X.append(np.array(diag_x[:-1]))
         y.append(np.array(diag_y[1:]))
-    pickle.dump([np.array(X),np.array(y)],open('data/Xy_words_tags.pkl','wb'))
+    #pickle.dump([np.array(X),np.array(y)],open('data/Xy_words_tags.pkl','wb'))
 
-    #build_ngram_data(featvecs,n,ylen)
+    build_ngram_data(n,X,y)
 
     print(nrT,nrUtt)
     #'''
@@ -114,22 +115,21 @@ def create_feature_vec(utt,prev_uttvec,prev_tag):
     return tag,np.array(feat_vec)
 
 
-def build_ngram_data(featvecs,n,ylen):
+def build_ngram_data(n,Xin,yin):
 
     X = []
     y = []
-    gram = deque([],n)
-    for i in range(len(featvecs)-1):
-        if len(gram) == n:
-            X.append(np.array(gram))
-            y.append(np.array(featvecs[i+1][:ylen]))
-        if None in featvecs[i]:
-            gram = deque([],n)
-        else:
-            gram.append(featvecs[i])
+    for diag_x,diag_y in zip(Xin,yin):
+        gram = deque([],n)
+        for x,single_y in zip(diag_x,diag_y):
+            if len(gram) == n:
+                X.append(np.array(gram))
+                y.append(np.array(single_y))
+            else:
+                gram.append(x)
             
-    pickle.dump(X, open('data/X%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))
-    pickle.dump(y, open('data/y%d_%dwv_%dpv.pkl'%(n,wordvec_len,posvec_len),'wb'))        
+    pickle.dump(X, open('data/X%d_%dwv.pkl'%(n,wordvec_len),'wb'))
+    pickle.dump(y, open('data/y%d_%dwv.pkl'%(n,wordvec_len),'wb'))        
 
     
 def tag_class_vec(tag):
