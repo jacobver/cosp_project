@@ -19,8 +19,8 @@ def main():
 
     [X,y] = pickle.load(open('data/Xy_complete_tagclasses.pkl','rb'))
 
-    Xt_train,Xw_train,y_train = build_ngram_data(ngram_n,X[:1001],y[:1001])
-    Xt_test,Xw_test,y_test = build_ngram_data(ngram_n,X[1001:],y[1001:])
+    Xt_train,Xw_train,y_train = build_ngram_data(ngram_n,X[:1116],y[:1116])
+    Xt_test,Xw_test,y_test = build_ngram_data(ngram_n,X[1116:],y[1116:])
 
     n = ngram_n
     in_n = len(Xw_train)
@@ -41,9 +41,16 @@ def main():
     outputs = Dense(out_n, activation='softmax')(x)
 
     model = Model(input=[tag,utt_words],output=outputs)
-    model.compile(optimizer='rmsprop',loss='categorical_crossentropy',metrics=['accuracy'])
+    model.compile(optimizer='sgd',loss='categorical_crossentropy',metrics=['accuracy'])
 
-    model.fit([Xt_train,Xw_train],y_train,batch_size=512)
+
+    model.fit([Xt_train,Xw_train],y_train,nb_epoch=1,batch_size=512)
+
+    print(model.evaluate([Xt_test,Xw_test],y_test))
+    y_preds = model.predict([Xt_test,Xw_test],verbose=1)
+
+    pickle.dump(y_preds,open('data/output_%dgram_classes_test1.pkl'%n,'wb'))
+    pickle.dump(y_test,open('data/test_%dgram_classes_test1.pkl'%n,'wb'))
 
 def build_ngram_data(n,Xin,yin):
     Xt = []
